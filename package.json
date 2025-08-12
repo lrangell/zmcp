@@ -1,0 +1,43 @@
+{
+  "name": "obsidian-mcp-server",
+  "version": "1.0.0",
+  "description": "Obsidian plugin that serves an MCP server for note operations",
+  "main": "main.js",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "NODE_ENV=production vite build",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "lint": "oxlint src --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm format && pnpm lint && pnpm typecheck",
+    "link": "./scripts/link-plugin.sh",
+    "unlink": "./scripts/unlink-plugin.sh"
+  },
+  "keywords": [
+    "obsidian",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "neverthrow": "^7.0.0",
+    "remeda": "^2.0.0",
+    "ts-mcp-forge": "^0.3.0",
+    "ts-pattern": "^5.0.0"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.13.3",
+    "@types/node": "^22.10.5",
+    "builtin-modules": "^5.0.0",
+    "obsidian": "latest",
+    "obsidian-community-lib": "^2.0.2",
+    "obsidian-typings": "^3.16.0",
+    "oxlint": "^1.11.1",
+    "prettier": "^3.4.2",
+    "tslib": "^2.8.1",
+    "typescript": "^5.7.2",
+    "unplugin-swc": "^1.5.5",
+    "vite": "^7.1.2"
+  }
+}

@@ -1,0 +1,69 @@
+# Documentation and Claude instructions
+CLAUDE.md
+docs/
+
+# Obsidian plugin build output and config
+main.js
+data.json
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+build/
+*.js.map
+*.d.ts.map
+
+# Obsidian plugin build output (main.js is the compiled plugin)
+# main.js is tracked as it's the plugin output
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.bak
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage/
+*.lcov
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Optional: Lock files (some projects track these, some don't)
+# Uncomment if you don't want to track lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

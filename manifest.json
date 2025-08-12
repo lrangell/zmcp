@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-mcp-server",
+  "name": "MCP Server",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Serves an MCP server for note operations and prompt resources",
+  "author": "Obsidian MCP",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}

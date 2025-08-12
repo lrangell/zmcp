@@ -1,0 +1,6 @@
+node_modules/
+dist/
+main.js
+pnpm-lock.yaml
+*.min.js
+*.bundle.js
