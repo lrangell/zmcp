@@ -64,9 +64,7 @@ export default class MCPPlugin extends Plugin {
       await this.transport.start(this.server);
 
       new Notice(`MCP Server started on port ${this.settings.port}`);
-      console.log(`MCP Server running on http://localhost:${this.settings.port}`);
     } catch (error) {
-      console.error('Failed to start MCP server:', error);
       new Notice(`Failed to start MCP server: ${error}`);
       this.transport = null;
       this.server = null;
@@ -86,7 +84,6 @@ export default class MCPPlugin extends Plugin {
         new Notice('MCP Server stopped');
       }
     } catch (error) {
-      console.error('Failed to stop MCP server:', error);
       new Notice(`Failed to stop MCP server: ${error}`);
     }
   }

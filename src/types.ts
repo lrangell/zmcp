@@ -1,3 +1,5 @@
+import type { PromptArgument } from './promptProcessor/types';
+
 export interface MCPSettings {
   port: number;
   promptFolders: string[];
@@ -39,6 +41,22 @@ export interface PluginInfo {
   documentationUrl?: string;
   authorUrl?: string;
   fundingUrl?: string;
+}
+
+export interface PluginManifest {
+  id?: string;
+  name?: string;
+  description?: string;
+  version?: string;
+  author?: string;
+  authorUrl?: string;
+  fundingUrl?: string;
+}
+
+export interface DynamicPrompt {
+  name: string;
+  description: string;
+  arguments: PromptArgument[];
 }
 
 export interface PromptContent {

@@ -1,5 +1,6 @@
-import { App, TFile, getAllTags } from 'obsidian';
-import { Result, ok, err } from 'neverthrow';
+import { App, TFile } from 'obsidian';
+import { Result, ok, ResultAsync } from 'neverthrow';
+import { getFileTags } from '../utils/fileOperations';
 import { match } from 'ts-pattern';
 import { pipe, map, filter, flatMap, reduce, unique } from 'remeda';
 import { SegmentType, ContentType, MessageRole, REGEX_PATTERNS } from './constants';
@@ -27,7 +28,6 @@ import {
   parseImageDimensions,
   sortByPosition,
   mergeOverlappingSegments,
-  extractTextBetweenSegments,
   bufferToBase64,
   getFileExtension,
   getBaseName,
@@ -41,21 +41,17 @@ export class PromptProcessor {
   ) {}
 
   async processPrompt(args?: Record<string, string>): Promise<Result<ProcessingResult, string>> {
-    try {
-      const content = await this.app.vault.read(this.file);
-      const segmentsResult = this.parseSegments(content);
-
-      if (segmentsResult.isErr()) {
-        return err(segmentsResult.error);
-      }
-
-      const processed = await this.processSegments(segmentsResult.value, args);
-      const result = this.buildResult(processed);
-
-      return ok(result);
-    } catch (error) {
-      return err(`Failed to process prompt: ${String(error)}`);
-    }
+    return ResultAsync.fromPromise(
+      this.app.vault.read(this.file),
+      (error) => `Failed to read file: ${String(error)}`
+    )
+      .andThen((content) => this.parseSegments(content))
+      .andThen((segments) =>
+        ResultAsync.fromPromise(
+          this.processSegments(segments, args).then((processed) => this.buildResult(processed)),
+          (error) => `Failed to process segments: ${String(error)}`
+        )
+      );
   }
 
   async extractVariables(): Promise<PromptArgument[]> {
@@ -74,8 +70,7 @@ export class PromptProcessor {
           required: true,
         }))
       );
-    } catch (error) {
-      console.error('Failed to extract variables:', error);
+    } catch {
       return [];
     }
   }
@@ -98,9 +93,7 @@ export class PromptProcessor {
 
     const mergedSegments = pipe(allSegments, mergeOverlappingSegments, sortByPosition);
 
-    const textBetween = extractTextBetweenSegments(content, mergedSegments);
-
-    const completeSegments = this.insertTextSegments(content, mergedSegments, textBetween);
+    const completeSegments = this.insertTextSegments(content, mergedSegments);
 
     return ok(completeSegments);
   }
@@ -334,11 +327,7 @@ export class PromptProcessor {
     return [...blockSegments, ...inlineSegments];
   }
 
-  private insertTextSegments(
-    content: string,
-    segments: ParsedSegment[],
-    _textBetween: string[]
-  ): ParsedSegment[] {
+  private insertTextSegments(content: string, segments: ParsedSegment[]): ParsedSegment[] {
     const result: ParsedSegment[] = [];
     let lastEnd = 0;
 
@@ -544,8 +533,7 @@ export class PromptProcessor {
       const results = pipe(
         files,
         filter((file) => {
-          const cache = this.app.metadataCache.getFileCache(file);
-          const tags = cache ? getAllTags(cache) || [] : [];
+          const tags: string[] = getFileTags(file.path).unwrapOr([]);
           return tags.includes(tag);
         }),
         map((file) => `- [[${file.basename}]]`)
@@ -563,8 +551,7 @@ export class PromptProcessor {
       const matchingFiles = pipe(
         files,
         filter((file) => {
-          const cache = this.app.metadataCache.getFileCache(file);
-          const tags = cache ? getAllTags(cache) || [] : [];
+          const tags: string[] = getFileTags(file.path).unwrapOr([]);
           return tags.includes(tag);
         })
       );
@@ -594,7 +581,7 @@ export class PromptProcessor {
 
   private buildResult(processed: ProcessedContent[]): ProcessingResult {
     const messages = this.toPromptMessages(processed);
-    const metadata = this.extractMetadata(processed);
+    const metadata = this.extractMetadata();
 
     return {
       messages,
@@ -654,7 +641,7 @@ export class PromptProcessor {
     );
   }
 
-  private extractMetadata(_processed: ProcessedContent[]): PromptMetadata {
+  private extractMetadata(): PromptMetadata {
     return {
       variables: [],
       links: [],

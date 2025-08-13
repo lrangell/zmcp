@@ -1,5 +1,5 @@
 import { match, P } from 'ts-pattern';
-import { pipe, map, filter, unique } from 'remeda';
+import { pipe } from 'remeda';
 import { MIME_TYPES } from './constants';
 
 export function wrapInNode(
@@ -14,10 +14,6 @@ export function wrapInNode(
         .join(' ')
     : '';
   return `<${tag}${attrs}>\n${content}\n</${tag}>`;
-}
-
-export function wrapSimple(tag: string, content: string): string {
-  return `<${tag}>${content}</${tag}>`;
 }
 
 export function sanitizeTagName(name: string): string {
@@ -57,11 +53,6 @@ export function getMimeType(extension: string): string {
 export function isImageExtension(extension: string): boolean {
   const ext = extension.toLowerCase().replace('.', '');
   return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext);
-}
-
-export function isAudioExtension(extension: string): boolean {
-  const ext = extension.toLowerCase().replace('.', '');
-  return ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'].includes(ext);
 }
 
 export function parseObsidianLink(link: string): {
@@ -115,16 +106,6 @@ export function parseImageDimensions(link: string): {
     path,
     alt: dimensionsOrAlt,
   };
-}
-
-export function extractUniqueTags(items: string[]): string[] {
-  return pipe(
-    items,
-    filter((item): item is string => item !== null && item !== undefined),
-    map((item) => item.trim()),
-    filter((item) => item.length > 0),
-    unique()
-  );
 }
 
 export function sortByPosition<T extends { position: { start: number } }>(segments: T[]): T[] {
@@ -193,10 +174,6 @@ export function bufferToBase64(buffer: ArrayBuffer): string {
     binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
-}
-
-export function sanitizePath(path: string): string {
-  return path.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\//, '').replace(/\/$/, '');
 }
 
 export function getFileExtension(path: string): string {
