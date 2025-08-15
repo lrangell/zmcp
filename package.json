@@ -23,7 +23,7 @@
   "dependencies": {
     "neverthrow": "^7.0.0",
     "remeda": "^2.0.0",
-    "ts-mcp-forge": "^0.3.0",
+    "ts-mcp-forge": "^0.6.0",
     "ts-pattern": "^5.0.0"
   },
   "devDependencies": {

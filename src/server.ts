@@ -1,14 +1,7 @@
-import { MCPServer, Tool, Param, JsonRpcError, ErrorCodes } from 'ts-mcp-forge';
+import { MCPServer, Tool, Param, ErrorCode, McpError, wrapError } from 'ts-mcp-forge';
 import { Result, ok, err, ResultAsync, okAsync } from 'neverthrow';
 import { App, TFile } from 'obsidian';
-import {
-  MCPSettings,
-  NoteMetadata,
-  PromptResource,
-  PluginInfo,
-  PluginManifest,
-  DynamicPrompt,
-} from './types';
+import { MCPSettings, NoteMetadata, PromptResource, PluginInfo, PluginManifest } from './types';
 import {
   Task,
   TaskFilter,
@@ -47,7 +40,7 @@ export class ObsidianMCPServer extends MCPServer {
   private settings: MCPSettings;
   private promptResources: Map<string, PromptResource> = new Map();
   private fileWatchers: Set<() => void> = new Set();
-  private dynamicPrompts: Map<string, DynamicPrompt> = new Map();
+  private vaultPrompts: Map<string, any> = new Map();
 
   constructor(app: App, settings: MCPSettings) {
     super('Obsidian MCP Server', '1.0.0');
@@ -60,7 +53,10 @@ export class ObsidianMCPServer extends MCPServer {
   handleInitialize() {
     const baseResponse = super.handleInitialize();
 
-    if (this.promptResources.size > 0 || this.listPrompts().length > 0) {
+    const promptsList = this.listPrompts();
+    const promptsCount = Array.isArray(promptsList) ? promptsList.length : 0;
+
+    if (this.promptResources.size > 0 || promptsCount > 0) {
       baseResponse.capabilities.prompts = {
         listChanged: true,
       };
@@ -110,10 +106,16 @@ export class ObsidianMCPServer extends MCPServer {
   }
 
   private getCapabilities() {
+    const tools = this.listTools();
+    const prompts = this.listPrompts();
+    const resources = this.listResources();
+
     return {
-      tools: this.listTools().length,
-      prompts: this.listPrompts().length,
-      resources: this.listResources().length,
+      tools: Array.isArray(tools) ? tools.length : (tools as any)?.tools?.length || 0,
+      prompts: Array.isArray(prompts) ? prompts.length : (prompts as any)?.prompts?.length || 0,
+      resources: Array.isArray(resources)
+        ? resources.length
+        : (resources as any)?.resources?.length || 0,
     };
   }
 
@@ -187,7 +189,7 @@ export class ObsidianMCPServer extends MCPServer {
   }
 
   private async registerDynamicPrompts() {
-    this.dynamicPrompts.clear();
+    this.vaultPrompts.clear();
 
     const processResource = async ([promptName, resource]: [string, PromptResource]): Promise<
       Result<
@@ -218,7 +220,7 @@ export class ObsidianMCPServer extends MCPServer {
         .map((value) => {
           if (value !== null) {
             const { promptName, resource, variables } = value;
-            this.dynamicPrompts.set(promptName, {
+            this.vaultPrompts.set(promptName, {
               name: promptName,
               description: resource.description,
               arguments: variables,
@@ -233,12 +235,15 @@ export class ObsidianMCPServer extends MCPServer {
 
   listPrompts() {
     const staticPrompts = super.listPrompts();
-    const dynamicPromptsList = Array.from(this.dynamicPrompts.values());
+    const vaultPromptsList = Array.from(this.vaultPrompts.values());
 
-    return [...staticPrompts, ...dynamicPromptsList];
+    // Handle both array and object return types from super.listPrompts()
+    const staticArray = Array.isArray(staticPrompts) ? staticPrompts : [];
+
+    return [...staticArray, ...vaultPromptsList];
   }
 
-  async getPrompt(name: string, args?: any) {
+  async getPrompt(name: string, args?: any): Promise<Result<any, McpError>> {
     if (!this.promptResources.has(name)) {
       return super.getPrompt(name, args);
     }
@@ -247,9 +252,7 @@ export class ObsidianMCPServer extends MCPServer {
     const filePath = resource.path || resource.uri.replace('obsidian://prompt/', '');
 
     if (!fileExists(filePath)) {
-      return err(
-        new JsonRpcError(ErrorCodes.INVALID_REQUEST, `Prompt file not found: ${filePath}`)
-      );
+      return err(wrapError(ErrorCode.InvalidRequest, `Prompt file not found: ${filePath}`));
     }
 
     const file = this.app.vault.getAbstractFileByPath(filePath) as TFile;
@@ -262,7 +265,7 @@ export class ObsidianMCPServer extends MCPServer {
         description: resource.description,
         messages: processed.messages,
       }))
-      .mapErr((error) => new JsonRpcError(ErrorCodes.INTERNAL_ERROR, error));
+      .mapErr((error) => wrapError(ErrorCode.InternalError, error));
   }
 
   async complete(

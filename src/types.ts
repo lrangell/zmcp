@@ -1,17 +1,24 @@
-import type { PromptArgument } from './promptProcessor/types';
+export const PLUGIN_NAME = 'zMCP';
+export const DEFAULT_PORT = 3983;
 
 export interface MCPSettings {
   port: number;
   promptFolders: string[];
   promptTags: string[];
+  resourceFolders: string[];
+  resourceTags: string[];
   serverEnabled: boolean;
+  debugMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: MCPSettings = {
-  port: 3000,
+  port: DEFAULT_PORT,
   promptFolders: [],
   promptTags: [],
+  resourceFolders: [],
+  resourceTags: [],
   serverEnabled: false,
+  debugMode: false,
 };
 
 export interface NoteMetadata {
@@ -51,12 +58,6 @@ export interface PluginManifest {
   author?: string;
   authorUrl?: string;
   fundingUrl?: string;
-}
-
-export interface DynamicPrompt {
-  name: string;
-  description: string;
-  arguments: PromptArgument[];
 }
 
 export interface PromptContent {
