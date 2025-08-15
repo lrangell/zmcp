@@ -2,7 +2,8 @@ import { Plugin, Notice } from 'obsidian';
 import { HTTPTransport } from 'ts-mcp-forge';
 import { ObsidianMCPServer } from './server';
 import { MCPSettingTab } from './settings';
-import { MCPSettings, DEFAULT_SETTINGS } from './types';
+import { MCPSettings, DEFAULT_SETTINGS, PLUGIN_NAME } from './types';
+import { logger } from './utils/logger';
 
 export default class MCPPlugin extends Plugin {
   settings: MCPSettings;
@@ -16,19 +17,19 @@ export default class MCPPlugin extends Plugin {
 
     this.addCommand({
       id: 'start-mcp-server',
-      name: 'Start MCP Server',
+      name: `Start ${PLUGIN_NAME}`,
       callback: () => this.startServer(),
     });
 
     this.addCommand({
       id: 'stop-mcp-server',
-      name: 'Stop MCP Server',
+      name: `Stop ${PLUGIN_NAME}`,
       callback: () => this.stopServer(),
     });
 
     this.addCommand({
       id: 'restart-mcp-server',
-      name: 'Restart MCP Server',
+      name: `Restart ${PLUGIN_NAME}`,
       callback: () => this.restartServer(),
     });
 
@@ -51,6 +52,7 @@ export default class MCPPlugin extends Plugin {
 
   async startServer() {
     try {
+      logger.info('Starting MCP server...');
       if (this.transport) {
         await this.stopServer();
       }
@@ -63,9 +65,11 @@ export default class MCPPlugin extends Plugin {
 
       await this.transport.start(this.server);
 
-      new Notice(`MCP Server started on port ${this.settings.port}`);
+      logger.info(`Server started successfully on port ${this.settings.port}`);
+      new Notice(`${PLUGIN_NAME} started on port ${this.settings.port}`);
     } catch (error) {
-      new Notice(`Failed to start MCP server: ${error}`);
+      logger.error('Failed to start server:', error);
+      new Notice(`Failed to start ${PLUGIN_NAME}: ${error}`);
       this.transport = null;
       this.server = null;
     }
@@ -73,6 +77,7 @@ export default class MCPPlugin extends Plugin {
 
   async stopServer() {
     try {
+      logger.info('Stopping MCP server...');
       if (this.transport) {
         if (this.server) {
           this.server.cleanup();
@@ -81,10 +86,12 @@ export default class MCPPlugin extends Plugin {
         await this.transport.stop();
         this.transport = null;
         this.server = null;
-        new Notice('MCP Server stopped');
+        logger.info('Server stopped');
+        new Notice(`${PLUGIN_NAME} stopped`);
       }
     } catch (error) {
-      new Notice(`Failed to stop MCP server: ${error}`);
+      logger.error('Failed to stop server:', error);
+      new Notice(`Failed to stop ${PLUGIN_NAME}: ${error}`);
     }
   }
 

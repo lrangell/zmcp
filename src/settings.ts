@@ -1,5 +1,6 @@
-import { App, PluginSettingTab, Setting, TFolder, FuzzySuggestModal } from 'obsidian';
+import { App, PluginSettingTab, Setting, TFolder, FuzzySuggestModal, Notice } from 'obsidian';
 import MCPPlugin from './main';
+import { DEFAULT_PORT, PLUGIN_NAME } from './types';
 
 class FolderSuggestModal extends FuzzySuggestModal<string> {
   private folders: string[];
@@ -60,11 +61,11 @@ export class MCPSettingTab extends PluginSettingTab {
   display(): void {
     this.containerEl.empty();
 
-    this.containerEl.createEl('h2', { text: 'MCP Server Settings' });
+    this.containerEl.createEl('h2', { text: `${PLUGIN_NAME} Settings` });
 
     new Setting(this.containerEl)
       .setName('Server Status')
-      .setDesc('Enable or disable the MCP server')
+      .setDesc(`Enable or disable the ${PLUGIN_NAME} server`)
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.serverEnabled).onChange(async (value) => {
           this.plugin.settings.serverEnabled = value;
@@ -93,11 +94,30 @@ export class MCPSettingTab extends PluginSettingTab {
     }
 
     new Setting(this.containerEl)
+      .setName('Debug Mode')
+      .setDesc('Enable debug logging to the console')
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.debugMode).onChange(async (value) => {
+          this.plugin.settings.debugMode = value;
+          await this.plugin.saveSettings();
+
+          // Update logger debug mode immediately
+          const { logger } = await import('./utils/logger');
+          logger.setDebugMode(value);
+
+          // If server is running, it will pick up the change
+          if (this.plugin.isServerRunning()) {
+            new Notice(`Debug mode ${value ? 'enabled' : 'disabled'}`);
+          }
+        })
+      );
+
+    new Setting(this.containerEl)
       .setName('Port')
-      .setDesc('Port number for the MCP server')
+      .setDesc(`Port number for the ${PLUGIN_NAME} server`)
       .addText((text) =>
         text
-          .setPlaceholder('3000')
+          .setPlaceholder(String(DEFAULT_PORT))
           .setValue(String(this.plugin.settings.port))
           .onChange(async (value) => {
             const port = parseInt(value);
@@ -118,12 +138,20 @@ export class MCPSettingTab extends PluginSettingTab {
       cls: 'setting-item-description',
     });
 
-    this.createFoldersSection(this.containerEl);
+    this.createPromptFoldersSection(this.containerEl);
+    this.createPromptTagsSection(this.containerEl);
 
-    this.createTagsSection(this.containerEl);
+    this.containerEl.createEl('h3', { text: 'MCP Resources' });
+    this.containerEl.createEl('p', {
+      text: 'Select folders and tags to expose as MCP resources (for reading)',
+      cls: 'setting-item-description',
+    });
+
+    this.createResourceFoldersSection(this.containerEl);
+    this.createResourceTagsSection(this.containerEl);
   }
 
-  private createFoldersSection(containerEl: HTMLElement): void {
+  private createPromptFoldersSection(containerEl: HTMLElement): void {
     const folderSetting = new Setting(containerEl)
       .setName('Prompt Folders')
       .setDesc('Click "Add Folder" to select folders to include as prompt sources');
@@ -157,7 +185,7 @@ export class MCPSettingTab extends PluginSettingTab {
     });
   }
 
-  private createTagsSection(containerEl: HTMLElement): void {
+  private createPromptTagsSection(containerEl: HTMLElement): void {
     const tagSetting = new Setting(containerEl)
       .setName('Prompt Tags')
       .setDesc('Click "Add Tag" to select tags to include as prompt sources');
@@ -325,6 +353,192 @@ export class MCPSettingTab extends PluginSettingTab {
 
     addFolder(vault.getRoot());
     return folders.sort();
+  }
+
+  private createResourceFoldersSection(containerEl: HTMLElement): void {
+    const folderSetting = new Setting(containerEl)
+      .setName('Resource Folders')
+      .setDesc('Click "Add Folder" to select folders to expose as MCP resources');
+
+    const selectedFoldersContainer = containerEl.createDiv({
+      cls: 'selected-items-container',
+    });
+
+    selectedFoldersContainer.style.marginBottom = '10px';
+    selectedFoldersContainer.style.minHeight = '30px';
+
+    this.renderSelectedResourceFolders(selectedFoldersContainer);
+
+    folderSetting.addButton((button) => {
+      button.setButtonText('Add Folder').onClick(() => {
+        const allFolders = this.getAllFolders();
+        const availableFolders = allFolders.filter(
+          (folder) => !this.plugin.settings.resourceFolders.includes(folder)
+        );
+
+        const modal = new FolderSuggestModal(this.app, availableFolders, async (folder) => {
+          if (!this.plugin.settings.resourceFolders.includes(folder)) {
+            this.plugin.settings.resourceFolders.push(folder);
+            await this.plugin.saveSettings();
+            this.plugin.updateServerSettings();
+            this.renderSelectedResourceFolders(selectedFoldersContainer);
+          }
+        });
+        modal.open();
+      });
+    });
+  }
+
+  private createResourceTagsSection(containerEl: HTMLElement): void {
+    const tagSetting = new Setting(containerEl)
+      .setName('Resource Tags')
+      .setDesc('Click "Add Tag" to select tags to expose as MCP resources');
+
+    const selectedTagsContainer = containerEl.createDiv({
+      cls: 'selected-items-container',
+    });
+
+    selectedTagsContainer.style.marginBottom = '10px';
+    selectedTagsContainer.style.minHeight = '30px';
+
+    this.renderSelectedResourceTags(selectedTagsContainer);
+
+    tagSetting.addButton((button) => {
+      button.setButtonText('Add Tag').onClick(() => {
+        const allTags = this.getAllTags();
+        const availableTags = allTags.filter(
+          (tag) => !this.plugin.settings.resourceTags.includes(tag)
+        );
+
+        const modal = new TagSuggestModal(this.app, availableTags, async (tag) => {
+          if (!this.plugin.settings.resourceTags.includes(tag)) {
+            this.plugin.settings.resourceTags.push(tag);
+            await this.plugin.saveSettings();
+            this.plugin.updateServerSettings();
+            this.renderSelectedResourceTags(selectedTagsContainer);
+          }
+        });
+        modal.open();
+      });
+    });
+  }
+
+  private renderSelectedResourceFolders(container: HTMLElement): void {
+    container.empty();
+
+    if (this.plugin.settings.resourceFolders.length === 0) {
+      container.createEl('div', {
+        text: 'No folders selected',
+        cls: 'setting-item-description',
+      });
+      return;
+    }
+
+    const listEl = container.createEl('div', {
+      cls: 'selected-items-list',
+    });
+
+    this.plugin.settings.resourceFolders.forEach((folder) => {
+      const itemEl = listEl.createDiv({
+        cls: 'selected-item',
+      });
+
+      itemEl.style.display = 'inline-flex';
+      itemEl.style.alignItems = 'center';
+      itemEl.style.margin = '2px';
+      itemEl.style.padding = '2px 8px';
+      itemEl.style.backgroundColor = 'var(--background-secondary)';
+      itemEl.style.borderRadius = '4px';
+      itemEl.style.border = '1px solid var(--background-modifier-border)';
+
+      itemEl.createSpan({ text: folder });
+
+      const removeBtn = itemEl.createSpan({
+        text: '×',
+        cls: 'remove-item',
+      });
+
+      removeBtn.style.marginLeft = '8px';
+      removeBtn.style.cursor = 'pointer';
+      removeBtn.style.fontWeight = 'bold';
+      removeBtn.style.color = 'var(--text-muted)';
+
+      removeBtn.addEventListener('click', async () => {
+        this.plugin.settings.resourceFolders = this.plugin.settings.resourceFolders.filter(
+          (f) => f !== folder
+        );
+        await this.plugin.saveSettings();
+        this.plugin.updateServerSettings();
+        this.renderSelectedResourceFolders(container);
+      });
+
+      removeBtn.addEventListener('mouseenter', () => {
+        removeBtn.style.color = 'var(--text-error)';
+      });
+
+      removeBtn.addEventListener('mouseleave', () => {
+        removeBtn.style.color = 'var(--text-muted)';
+      });
+    });
+  }
+
+  private renderSelectedResourceTags(container: HTMLElement): void {
+    container.empty();
+
+    if (this.plugin.settings.resourceTags.length === 0) {
+      container.createEl('div', {
+        text: 'No tags selected',
+        cls: 'setting-item-description',
+      });
+      return;
+    }
+
+    const listEl = container.createEl('div', {
+      cls: 'selected-items-list',
+    });
+
+    this.plugin.settings.resourceTags.forEach((tag) => {
+      const itemEl = listEl.createDiv({
+        cls: 'selected-item',
+      });
+
+      itemEl.style.display = 'inline-flex';
+      itemEl.style.alignItems = 'center';
+      itemEl.style.margin = '2px';
+      itemEl.style.padding = '2px 8px';
+      itemEl.style.backgroundColor = 'var(--background-secondary)';
+      itemEl.style.borderRadius = '4px';
+      itemEl.style.border = '1px solid var(--background-modifier-border)';
+
+      itemEl.createSpan({ text: tag });
+
+      const removeBtn = itemEl.createSpan({
+        text: '×',
+        cls: 'remove-item',
+      });
+
+      removeBtn.style.marginLeft = '8px';
+      removeBtn.style.cursor = 'pointer';
+      removeBtn.style.fontWeight = 'bold';
+      removeBtn.style.color = 'var(--text-muted)';
+
+      removeBtn.addEventListener('click', async () => {
+        this.plugin.settings.resourceTags = this.plugin.settings.resourceTags.filter(
+          (t) => t !== tag
+        );
+        await this.plugin.saveSettings();
+        this.plugin.updateServerSettings();
+        this.renderSelectedResourceTags(container);
+      });
+
+      removeBtn.addEventListener('mouseenter', () => {
+        removeBtn.style.color = 'var(--text-error)';
+      });
+
+      removeBtn.addEventListener('mouseleave', () => {
+        removeBtn.style.color = 'var(--text-muted)';
+      });
+    });
   }
 
   private getAllTags(): string[] {
